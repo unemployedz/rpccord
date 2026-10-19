@@ -1,13 +1,13 @@
 {
   "name": "TraceRemover",
-  "description": "Delete your own messages in the currently open DM. Requires confirm. Rate-limited.",
+  "description": "In a DM type .trace yes to delete your own messages. .trace stop to cancel.",
   "authors": [
     {
       "name": "unemployedz"
     }
   ],
   "main": "index.js",
-  "hash": "a279f5f6d12011d83a675748eabbeaba49802a24b4e165a100035d990c76e747",
+  "hash": "3d77979d1bbf2e0a9060515a6fdb17f4e66a1499c8660fceed91463ee09e60bc",
   "vendetta": {
     "icon": "ic_trash"
   }

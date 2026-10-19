@@ -1,14 +1,16 @@
 # TraceRemover
 
-Delete **your own** messages in a Discord DM (Kettu plugin).
+Delete **your own** messages in a DM using a chat command.
 
-## Important
+## Commands (in the DM)
 
-- Only deletes messages **you** sent
-- Only works in the **DM / group DM you currently have open**
-- Requires a confirm toggle before starting
-- Rate-limited to reduce API errors
-- **Cannot be undone**
+| Command | Action |
+|---------|--------|
+| `.trace` | Help toast |
+| `.trace yes` | Start deleting **your** messages in this DM |
+| `.trace stop` | Cancel |
+
+The command text is **not** posted to the chat.
 
 ## Install
 
@@ -16,10 +18,12 @@ Delete **your own** messages in a Discord DM (Kettu plugin).
 https://cdn.jsdelivr.net/gh/unemployedz/rpccord@main/dist/
 ```
 
-1. Remove ResearchCord / old plugin from this repo if installed  
-2. Install URL above → enable **TraceRemover**  
-3. Open the DM with the person  
-4. Plugin settings → set delay/max → enable confirm → **Start**
+## Notes
+
+- Only your messages
+- Only DMs / group DMs
+- Scroll up in the DM first for older history
+- Cannot be undone
 
 ## License
 
