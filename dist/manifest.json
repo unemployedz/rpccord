@@ -1,13 +1,13 @@
 {
   "name": "TraceRemover",
-  "description": "In a DM type .trace yes to delete your own messages. .trace stop to cancel.",
+  "description": "In a DM type .trace yes to delete your own messages. Toast confirms it loaded.",
   "authors": [
     {
       "name": "unemployedz"
     }
   ],
   "main": "index.js",
-  "hash": "3d77979d1bbf2e0a9060515a6fdb17f4e66a1499c8660fceed91463ee09e60bc",
+  "hash": "bd6be458a1a6116cc14d39d16399e02b9b334f852acbafd219bf8920db8912c0",
   "vendetta": {
     "icon": "ic_trash"
   }
