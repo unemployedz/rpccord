@@ -1,14 +1,14 @@
 {
-  "name": "ResearchCord",
-  "description": "Type .research <question> to ask Google Gemini. Read the answer or send it to chat.",
+  "name": "TraceRemover",
+  "description": "Delete your own messages in the currently open DM. Requires confirm. Rate-limited.",
   "authors": [
     {
       "name": "unemployedz"
     }
   ],
   "main": "index.js",
-  "hash": "b8c7899b2ff98cdfca8fce1f02f88675df0bae1865b5ba24fe9cfde3b6f4bfce",
+  "hash": "a279f5f6d12011d83a675748eabbeaba49802a24b4e165a100035d990c76e747",
   "vendetta": {
-    "icon": "ic_search"
+    "icon": "ic_trash"
   }
 }

@@ -1,228 +1,222 @@
 (()=>{
 const metro=vendetta.metro,patcher=vendetta.patcher,storage=vendetta.plugin.storage,ui=vendetta.ui;
-const {findByProps,findByName,findByStoreName}=metro;
+const {findByProps,findByStoreName,findByName}=metro;
 const {React,ReactNative}=metro.common;
-const {before}=patcher;
 const {showToast}=ui.toasts||{};
-const {View,Text,ScrollView,TextInput,TouchableOpacity,StyleSheet,ActivityIndicator,Switch,KeyboardAvoidingView,Platform}=ReactNative;
-const Navigation=findByProps("push","pushLazy","pop")||findByProps("push","pop");
-const Navigator=findByName("Navigator")||(findByProps("Navigator")||{}).Navigator;
-const modalClose=(findByProps("getRenderCloseButton")||{}).getRenderCloseButton||(findByProps("getHeaderCloseButton")||{}).getHeaderCloseButton;
-const MessageActions=findByProps("sendMessage","receiveMessage")||findByProps("sendMessage");
+const {View,Text,ScrollView,TouchableOpacity,StyleSheet,ActivityIndicator,TextInput,Switch}=ReactNative;
+
+const MessageActions=findByProps("deleteMessage","sendMessage")||findByProps("deleteMessage");
+const MessageStore=findByStoreName("MessageStore")||findByProps("getMessages","getMessage");
+const ChannelStore=findByStoreName("ChannelStore")||findByProps("getChannel");
+const UserStore=findByStoreName("UserStore")||findByProps("getCurrentUser");
 const SelectedChannelStore=findByStoreName("SelectedChannelStore")||findByProps("getChannelId");
-const PREFIX=".research";
-const GEMINI_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";
+const RestAPI=findByProps("get","post","delete","put")||findByProps("getAPIBaseURL");
 
 function ensure(){
-  if(storage.apiKey===undefined)storage.apiKey="";
-  if(storage.enabled===undefined)storage.enabled=true;
+  if(storage.delayMs===undefined)storage.delayMs="1200";
+  if(storage.maxDelete===undefined)storage.maxDelete="200";
 }
 
-async function askGemini(question){
-  const key=String(storage.apiKey||"").trim();
-  if(!key)return{ok:false,error:"No API key. Open ResearchCord settings and paste a Gemini API key from aistudio.google.com/apikey"};
-  const q=String(question||"").trim();
-  if(!q)return{ok:false,error:"Empty question."};
-  const url=GEMINI_URL+"?key="+encodeURIComponent(key);
-  const body={
-    contents:[{role:"user",parts:[{text:"You are a helpful research assistant inside Discord. Answer clearly and concisely. If unsure, say so.\n\nQuestion: "+q}]}],
-    generationConfig:{temperature:0.7,maxOutputTokens:1024}
-  };
-  try{
-    const ctrl=new AbortController();
-    const t=setTimeout(function(){ctrl.abort()},25000);
-    const res=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:ctrl.signal});
-    clearTimeout(t);
-    const data=await res.json().catch(function(){return null});
-    if(!res.ok){
-      const msg=(data&&data.error&&data.error.message)||("HTTP "+res.status);
-      return{ok:false,error:String(msg)};
-    }
-    const parts=data&&data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts;
-    let text="";
-    if(Array.isArray(parts)){
-      for(const p of parts){if(p&&typeof p.text==="string")text+=p.text}
-    }
-    text=text.trim();
-    if(!text)return{ok:false,error:"Empty response from Gemini."};
-    return{ok:true,text:text};
-  }catch(e){
-    if(e&&e.name==="AbortError")return{ok:false,error:"Request timed out."};
-    return{ok:false,error:String(e&&e.message||e)};
-  }
+function meId(){
+  try{const u=UserStore.getCurrentUser&&UserStore.getCurrentUser();return u&&u.id}catch(e){return null}
 }
 
-function sendToChat(text){
+function currentChannelId(){
+  try{return SelectedChannelStore.getChannelId&&SelectedChannelStore.getChannelId()}catch(e){return null}
+}
+
+function isDmChannel(channelId){
   try{
-    const channelId=SelectedChannelStore&&SelectedChannelStore.getChannelId&&SelectedChannelStore.getChannelId();
-    if(!channelId||!MessageActions||!MessageActions.sendMessage){
-      showToast&&showToast("Could not send — no channel");
-      return false;
+    const ch=ChannelStore.getChannel&&ChannelStore.getChannel(channelId);
+    if(!ch)return false;
+    return ch.type===1||ch.type===3;
+  }catch(e){return false}
+}
+
+function sleep(ms){return new Promise(function(r){setTimeout(r,ms)})}
+
+async function fetchMessagesPage(channelId, before){
+  try{
+    if(RestAPI&&RestAPI.get){
+      let path="/channels/"+channelId+"/messages?limit=100";
+      if(before)path+="&before="+before;
+      const res=await RestAPI.get({url:path});
+      const body=res&&(res.body||res);
+      if(Array.isArray(body))return body;
+      if(body&&Array.isArray(body.messages))return body.messages;
     }
-    MessageActions.sendMessage(channelId,{content:String(text).slice(0,2000)});
-    showToast&&showToast("Sent to chat");
-    return true;
-  }catch(e){
-    try{showToast&&showToast("Send failed")}catch(_){}
-    return false;
+  }catch(e){}
+  try{
+    const bag=MessageStore.getMessages&&MessageStore.getMessages(channelId);
+    let arr=[];
+    if(bag&&bag.toArray)arr=bag.toArray();
+    else if(bag&&bag._array)arr=bag._array;
+    else if(Array.isArray(bag))arr=bag;
+    else if(bag&&typeof bag==="object"){
+      arr=Object.values(bag).filter(function(m){return m&&m.id});
+    }
+    return arr;
+  }catch(e){return []}
+}
+
+async function deleteOne(channelId,messageId){
+  if(MessageActions&&MessageActions.deleteMessage){
+    try{
+      await MessageActions.deleteMessage(channelId,messageId);
+      return true;
+    }catch(e){}
   }
+  try{
+    if(RestAPI&&RestAPI.delete){
+      await RestAPI.delete({url:"/channels/"+channelId+"/messages/"+messageId});
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
+async function collectOwnMessageIds(channelId,myId,maxCount){
+  const ids=[];
+  const seen={};
+  let before=undefined;
+  let pages=0;
+  while(ids.length<maxCount&&pages<30){
+    pages++;
+    const batch=await fetchMessagesPage(channelId,before);
+    if(!batch||!batch.length)break;
+    let oldest=null;
+    for(const m of batch){
+      if(!m||!m.id)continue;
+      if(!oldest||BigInt(m.id)<BigInt(oldest))oldest=m.id;
+      const authorId=m.authorId||(m.author&&m.author.id)||m.author_id;
+      if(String(authorId)!==String(myId))continue;
+      if(seen[m.id])continue;
+      seen[m.id]=true;
+      ids.push(m.id);
+      if(ids.length>=maxCount)break;
+    }
+    if(!oldest||(before&&oldest===before))break;
+    before=oldest;
+    await sleep(400);
+  }
+  return ids;
 }
 
 const styles=StyleSheet.create({
   root:{flex:1,backgroundColor:"#111214"},
-  pad:{padding:16,paddingBottom:40},
-  title:{fontSize:18,fontWeight:"700",color:"#fff",marginBottom:8},
+  pad:{padding:16,paddingBottom:48},
+  title:{fontSize:20,fontWeight:"700",color:"#fff",marginBottom:8},
+  warn:{fontSize:13,color:"#f0b232",lineHeight:18,marginBottom:12},
+  hint:{fontSize:13,color:"#b5bac1",lineHeight:18,marginBottom:12},
   label:{fontSize:12,color:"#949ba4",marginBottom:6,marginTop:10,fontWeight:"600"},
-  body:{fontSize:16,lineHeight:24,color:"#f2f3f5"},
-  err:{fontSize:15,lineHeight:22,color:"#f23f43"},
+  body:{fontSize:15,color:"#f2f3f5",lineHeight:22},
   input:{backgroundColor:"#1e1f22",color:"#f2f3f5",borderRadius:8,padding:12,fontSize:15,borderWidth:1,borderColor:"#2b2d31"},
   btn:{backgroundColor:"#5865f2",paddingVertical:14,borderRadius:8,alignItems:"center",marginTop:12},
+  btnDanger:{backgroundColor:"#da373c",paddingVertical:14,borderRadius:8,alignItems:"center",marginTop:12},
   btn2:{backgroundColor:"#4e5058",paddingVertical:12,borderRadius:8,alignItems:"center",marginTop:8},
-  btnOk:{backgroundColor:"#248046",paddingVertical:14,borderRadius:8,alignItems:"center",marginTop:12},
   btnText:{color:"#fff",fontWeight:"700",fontSize:16},
-  hint:{fontSize:13,color:"#b5bac1",lineHeight:18,marginBottom:12},
-  center:{flex:1,alignItems:"center",justifyContent:"center",padding:24,backgroundColor:"#111214"},
-  row:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",marginVertical:10}
+  status:{fontSize:14,color:"#b5bac1",marginTop:12,lineHeight:20}
 });
-
-function ResultScreen(props){
-  const question=props.question||"";
-  const[status,setStatus]=React.useState("loading");
-  const[answer,setAnswer]=React.useState("");
-  const[error,setError]=React.useState("");
-  React.useEffect(function(){
-    let cancelled=false;
-    (async function(){
-      const r=await askGemini(question);
-      if(cancelled)return;
-      if(r.ok){setAnswer(r.text);setStatus("ok")}
-      else{setError(r.error);setStatus("err")}
-    })();
-    return function(){cancelled=true};
-  },[question]);
-
-  if(status==="loading"){
-    return React.createElement(View,{style:styles.center},
-      React.createElement(ActivityIndicator,{size:"large",color:"#5865f2"}),
-      React.createElement(Text,{style:{color:"#b5bac1",marginTop:12}},"Researching with Gemini…")
-    );
-  }
-  if(status==="err"){
-    return React.createElement(ScrollView,{style:styles.root,contentContainerStyle:styles.pad},
-      React.createElement(Text,{style:styles.label},"Error"),
-      React.createElement(Text,{style:styles.err,selectable:true},error),
-      React.createElement(Text,{style:styles.label},"Question"),
-      React.createElement(Text,{style:styles.body,selectable:true},question)
-    );
-  }
-  return React.createElement(ScrollView,{style:styles.root,contentContainerStyle:styles.pad},
-    React.createElement(Text,{style:styles.label},"Question"),
-    React.createElement(Text,{style:styles.body,selectable:true},question),
-    React.createElement(Text,{style:styles.label},"Answer (Gemini)"),
-    React.createElement(Text,{style:styles.body,selectable:true},answer),
-    React.createElement(TouchableOpacity,{style:styles.btnOk,onPress:function(){
-      sendToChat("**Research:** "+question+"\n\n"+answer);
-    }},React.createElement(Text,{style:styles.btnText},"Send to chat")),
-    React.createElement(TouchableOpacity,{style:styles.btn2,onPress:function(){
-      try{
-        const Clipboard=findByProps("setString","getString");
-        if(Clipboard&&Clipboard.setString){Clipboard.setString(answer);showToast&&showToast("Copied answer")}
-        else showToast&&showToast("Copy not available");
-      }catch(e){showToast&&showToast("Copy failed")}
-    }},React.createElement(Text,{style:styles.btnText},"Copy answer only")),
-    React.createElement(Text,{style:[styles.hint,{marginTop:16}]},"Send posts to this channel. Copy or close = nothing is sent.")
-  );
-}
-
-function openResult(question){
-  if(!Navigator||!Navigation){
-    (async function(){
-      showToast&&showToast("Researching…");
-      const r=await askGemini(question);
-      if(!r.ok){showToast&&showToast(r.error.slice(0,120));return}
-      showToast&&showToast(r.text.slice(0,140));
-    })();
-    return;
-  }
-  const screen=function(){
-    return React.createElement(Navigator,{
-      initialRouteName:"ResearchResult",
-      goBackOnBackPress:true,
-      screens:{
-        ResearchResult:{
-          title:"Research",
-          headerLeft:modalClose?modalClose(function(){Navigation.pop()}):undefined,
-          render:function(){return React.createElement(ResultScreen,{question:question})}
-        }
-      }
-    });
-  };
-  try{Navigation.push(screen)}catch(e){showToast&&showToast("Could not open result screen")}
-}
-
-function handleOutgoing(content){
-  if(!storage.enabled)return null;
-  const trimmed=String(content||"").trim();
-  if(!trimmed.toLowerCase().startsWith(PREFIX))return null;
-  const question=trimmed.slice(PREFIX.length).trim();
-  if(!question){showToast&&showToast("Usage: .research your question");return ""}
-  openResult(question);
-  return "";
-}
-
-let unpatchSend;
-function patchSend(){
-  if(!MessageActions||!MessageActions.sendMessage){console.warn("[ResearchCord] sendMessage not found");return}
-  unpatchSend=before("sendMessage",MessageActions,function(args){
-    try{
-      let msg=null,idx=-1;
-      if(args[1]&&typeof args[1]==="object"&&args[1].content!==undefined){msg=args[1];idx=1}
-      else if(args[0]&&typeof args[0]==="object"&&args[0].content!==undefined){msg=args[0];idx=0}
-      if(!msg)return;
-      const result=handleOutgoing(msg.content);
-      if(result===null)return;
-      msg.content="";
-      args[idx]=Object.assign({},msg,{content:""});
-      throw new Error("RESEARCHCORD_BLOCK");
-    }catch(e){
-      if(e&&e.message==="RESEARCHCORD_BLOCK")throw e;
-    }
-  });
-}
 
 function Settings(){
   ensure();
-  const[key,setKey]=React.useState(String(storage.apiKey||""));
-  const[enabled,setEnabled]=React.useState(!!storage.enabled);
-  return React.createElement(KeyboardAvoidingView,{style:styles.root,behavior:Platform.OS==="ios"?"padding":undefined},
-    React.createElement(ScrollView,{contentContainerStyle:styles.pad,keyboardShouldPersistTaps:"handled"},
-      React.createElement(Text,{style:styles.title},"ResearchCord"),
-      React.createElement(Text,{style:styles.hint},"Type in any chat:\n.research your question\n\nThen read, copy, or send to chat."),
-      React.createElement(View,{style:styles.row},
-        React.createElement(Text,{style:{color:"#fff",fontSize:16}},"Enabled"),
-        React.createElement(Switch,{value:enabled,onValueChange:function(v){setEnabled(v);storage.enabled=v}})
-      ),
-      React.createElement(Text,{style:styles.label},"Gemini API key"),
-      React.createElement(TextInput,{
-        style:styles.input,value:key,
-        onChangeText:function(t){setKey(t);storage.apiKey=t},
-        placeholder:"Paste key from aistudio.google.com/apikey",
-        placeholderTextColor:"#6d6f78",autoCapitalize:"none",autoCorrect:false,secureTextEntry:true
-      }),
-      React.createElement(Text,{style:styles.hint},"Free key: aistudio.google.com/apikey — stays on your device."),
-      React.createElement(TouchableOpacity,{style:styles.btn,onPress:function(){
-        storage.apiKey=key;showToast&&showToast(key.trim()?"Key saved":"Key cleared");
-      }},React.createElement(Text,{style:styles.btnText},"Save key")),
-      React.createElement(TouchableOpacity,{style:styles.btn2,onPress:function(){
-        openResult("Say hello in one short sentence.");
-      }},React.createElement(Text,{style:styles.btnText},"Test research"))
-    )
+  const[status,setStatus]=React.useState("idle");
+  const[log,setLog]=React.useState("");
+  const[delayMs,setDelayMs]=React.useState(String(storage.delayMs||"1200"));
+  const[maxDelete,setMaxDelete]=React.useState(String(storage.maxDelete||"200"));
+  const[confirm,setConfirm]=React.useState(false);
+  const running=React.useRef(false);
+
+  function append(line){
+    setLog(function(prev){return line+"\n"+prev});
+  }
+
+  async function runPurge(){
+    if(running.current)return;
+    const my=meId();
+    const channelId=currentChannelId();
+    if(!my){showToast&&showToast("Not logged in");return}
+    if(!channelId){showToast&&showToast("Open a DM first");return}
+    if(!isDmChannel(channelId)){
+      showToast&&showToast("Open a DM (not a server channel)");
+      setLog("Blocked: current chat is not a DM/group DM.");
+      return;
+    }
+    if(!confirm){
+      showToast&&showToast("Turn on the confirm switch first");
+      return;
+    }
+    const delay=Math.max(600,parseInt(delayMs,10)||1200);
+    const max=Math.min(500,Math.max(1,parseInt(maxDelete,10)||200));
+    storage.delayMs=String(delay);
+    storage.maxDelete=String(max);
+    running.current=true;
+    setStatus("running");
+    setLog("Scanning your messages in this DM…");
+    try{
+      const ids=await collectOwnMessageIds(channelId,my,max);
+      if(!ids.length){
+        setLog("No messages of yours found in loaded history.");
+        setStatus("idle");
+        running.current=false;
+        return;
+      }
+      append("Found "+ids.length+" of your messages. Deleting…");
+      let ok=0,fail=0;
+      for(let i=0;i<ids.length;i++){
+        if(!running.current){append("Stopped by user.");break}
+        const id=ids[i];
+        const success=await deleteOne(channelId,id);
+        if(success)ok++;else fail++;
+        if(i%5===0||i===ids.length-1){
+          setLog("Deleted "+ok+"/"+ids.length+(fail?" (fails: "+fail+")":"")+"…");
+        }
+        await sleep(delay);
+      }
+      setLog("Done. Deleted ~"+ok+" message(s)."+(fail?" Failed: "+fail:""));
+      showToast&&showToast("Trace remove finished: "+ok);
+    }catch(e){
+      setLog("Error: "+String(e&&e.message||e));
+    }
+    setStatus("idle");
+    running.current=false;
+    setConfirm(false);
+  }
+
+  function stop(){
+    running.current=false;
+    setStatus("idle");
+    append("Stopping…");
+  }
+
+  const ch=currentChannelId();
+  const dm=ch&&isDmChannel(ch);
+
+  return React.createElement(ScrollView,{style:styles.root,contentContainerStyle:styles.pad},
+    React.createElement(Text,{style:styles.title},"TraceRemover"),
+    React.createElement(Text,{style:styles.warn},"Deletes ONLY messages you sent. Only works in DMs / group DMs you currently have open. Cannot be undone."),
+    React.createElement(Text,{style:styles.hint},"1) Open the DM with the person\n2) Set delay & max\n3) Enable confirm\n4) Tap Start"),
+    React.createElement(Text,{style:styles.label},"Current chat"),
+    React.createElement(Text,{style:styles.body},ch?(dm?"DM/Group open ✓  ("+ch+")":"Not a DM — open a private chat"):"No channel selected"),
+    React.createElement(Text,{style:styles.label},"Delay between deletes (ms)"),
+    React.createElement(TextInput,{style:styles.input,value:delayMs,onChangeText:setDelayMs,keyboardType:"number-pad"}),
+    React.createElement(Text,{style:styles.label},"Max messages to delete (cap 500)"),
+    React.createElement(TextInput,{style:styles.input,value:maxDelete,onChangeText:setMaxDelete,keyboardType:"number-pad"}),
+    React.createElement(View,{style:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",marginTop:12}},
+      React.createElement(Text,{style:{color:"#fff",fontSize:15,flex:1}},"I understand this deletes my messages"),
+      React.createElement(Switch,{value:confirm,onValueChange:setConfirm})
+    ),
+    status==="running"
+      ? React.createElement(TouchableOpacity,{style:styles.btn2,onPress:stop},React.createElement(Text,{style:styles.btnText},"Stop"))
+      : React.createElement(TouchableOpacity,{style:styles.btnDanger,onPress:runPurge},React.createElement(Text,{style:styles.btnText},"Start trace remove")),
+    status==="running"?React.createElement(ActivityIndicator,{color:"#5865f2",style:{marginTop:12}}):null,
+    React.createElement(Text,{style:styles.status,selectable:true},log||"Ready.")
   );
 }
 
 return{
-  onLoad:function(){ensure();patchSend()},
-  onUnload:function(){if(unpatchSend)unpatchSend();unpatchSend=undefined},
+  onLoad:function(){ensure()},
+  onUnload:function(){},
   settings:Settings
 };
 })()
