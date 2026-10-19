@@ -1,14 +1,14 @@
 {
-  "name": "BadgeCord",
-  "description": "Client-side only: show Bug Hunter (gold) and Early Verified Bot Developer badges on your own profile. Nobody else can see them.",
+  "name": "ResearchCord",
+  "description": "Type .research <question> to ask Google Gemini. Read the answer or send it to chat.",
   "authors": [
     {
       "name": "unemployedz"
     }
   ],
   "main": "index.js",
-  "hash": "d24603abf6e50cf27bb74fcd3f0b1fdc9d7cc714d0f4b922674ef20abfb794df",
+  "hash": "282fbfa8d5c8f182ac31fb84304ad83ceca374252ed9a676d5370eef44da2ce3",
   "vendetta": {
-    "icon": "ic_person"
+    "icon": "ic_search"
   }
 }

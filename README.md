@@ -1,25 +1,40 @@
-# BadgeCord
+# ResearchCord
 
-Client-side profile badges for **Kettu** (iOS/Android).
+Research in Discord with **Google Gemini**.
 
-Shows on **your** profile only:
-- **Bug Hunter** (gold / yellow)
-- **Early Verified Bot Developer**
-- Optional: Early Supporter, Active Developer
+## Usage
 
-**Other people cannot see these.** This does not grant real Discord badges.
+In any chat type:
 
-## Install
+```
+.research your question here
+```
+
+A screen opens with the answer.
+
+- **Send to chat** — posts question + answer to the channel  
+- **Copy answer only** — copies text, does not send  
+- Or just read and close — nothing is sent  
+
+## Setup
+
+1. Get a free API key: https://aistudio.google.com/apikey  
+2. Install plugin → Settings → paste key → Save  
+3. Type `.research ...` in a chat  
+
+## Install (Kettu)
 
 ```
 https://cdn.jsdelivr.net/gh/unemployedz/rpccord@main/dist/
 ```
 
-1. Remove old **RPCCord** if installed
-2. Install URL above
-3. Enable **BadgeCord**
-4. Open plugin settings — toggles are on by default for Bug Hunter + Early Developer
-5. Open **your profile**, close it, open again
+Remove old BadgeCord/RPCCord first if still installed.
+
+## Privacy
+
+- API key stored only on your device  
+- Only the question text is sent to Google Gemini  
+- Nothing is posted to Discord until you tap **Send to chat**
 
 ## License
 
