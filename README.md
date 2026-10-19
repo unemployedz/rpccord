@@ -1,40 +1,25 @@
-# RPCCord
+# BadgeCord
 
-Custom **Rich Presence** for **Kettu** (Discord iOS/Android mod).
+Client-side profile badges for **Kettu** (iOS/Android).
 
-Shows a custom "Playing / Listening / Watching / Streaming / Competing" activity on your profile — same idea as Vencord CustomRPC, but built for mobile using Discord’s `LOCAL_ACTIVITY_UPDATE` API (works inside the modded client; no PC required).
+Shows on **your** profile only:
+- **Bug Hunter** (gold / yellow)
+- **Early Verified Bot Developer**
+- Optional: Early Supporter, Active Developer
 
-## Install (Kettu)
+**Other people cannot see these.** This does not grant real Discord badges.
 
-Plugins → **+** → paste:
+## Install
 
 ```
 https://cdn.jsdelivr.net/gh/unemployedz/rpccord@main/dist/
 ```
 
-Enable **RPCCord**, open its **settings**, fill fields, tap **Apply presence**.
-
-## Features
-
-- Activity types: Playing, Streaming, Listening, Watching, Competing
-- Name, details, state, party size, elapsed timer
-- Optional Application ID + image asset keys (from [Discord Developer Portal](https://discord.com/developers/applications))
-- Quick game-style presets
-- Clear presence on demand / on plugin unload
-
-## Limits (honest)
-
-| What works | What does not |
-|------------|----------------|
-| Custom "Playing X" others see on your profile | Auto-detecting real games running on the phone |
-| Using your own Developer Portal app + assets | Full official Xbox/PlayStation/Spotify *account linking* UI |
-| iOS + Android with Kettu | Desktop-only IPC / Discord Game SDK |
-
-Linked game accounts (Xbox, etc.) are controlled by Discord’s own connections — this plugin **spoofs activity text/assets** the same way other mobile RPC plugins do, which is what most people want for "custom RPC".
-
-## Privacy
-
-Does not collect tokens beyond what Discord already has in the client. Only dispatches a local activity update.
+1. Remove old **RPCCord** if installed
+2. Install URL above
+3. Enable **BadgeCord**
+4. Open plugin settings — toggles are on by default for Bug Hunter + Early Developer
+5. Open **your profile**, close it, open again
 
 ## License
 

@@ -1,14 +1,14 @@
 {
-  "name": "RPCCord",
-  "description": "Custom Rich Presence for Kettu. Edit fields, tap Apply, see Playing on your profile.",
+  "name": "BadgeCord",
+  "description": "Client-side only: show Bug Hunter (gold) and Early Verified Bot Developer badges on your own profile. Nobody else can see them.",
   "authors": [
     {
       "name": "unemployedz"
     }
   ],
   "main": "index.js",
-  "hash": "0cd8d77678dda47202a9029abdb1335da7eff54d4e4dd9882c69799607ebb984",
+  "hash": "d24603abf6e50cf27bb74fcd3f0b1fdc9d7cc714d0f4b922674ef20abfb794df",
   "vendetta": {
-    "icon": "ic_games"
+    "icon": "ic_person"
   }
 }
