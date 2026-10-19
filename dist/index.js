@@ -11,7 +11,7 @@ const modalClose=(findByProps("getRenderCloseButton")||{}).getRenderCloseButton|
 const MessageActions=findByProps("sendMessage","receiveMessage")||findByProps("sendMessage");
 const SelectedChannelStore=findByStoreName("SelectedChannelStore")||findByProps("getChannelId");
 const PREFIX=".research";
-const GEMINI_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+const GEMINI_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";
 
 function ensure(){
   if(storage.apiKey===undefined)storage.apiKey="";
