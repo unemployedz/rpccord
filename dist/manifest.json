@@ -1,0 +1,14 @@
+{
+  "name": "RPCCord",
+  "description": "Custom Rich Presence (Playing / Listening / Watching / etc.) for Kettu. Mobile-safe via LOCAL_ACTIVITY_UPDATE.",
+  "authors": [
+    {
+      "name": "unemployedz"
+    }
+  ],
+  "main": "index.js",
+  "hash": "e1979f6d430bea24f26e6c1c7d94f3dbed0984974d72bc9a0ada54b6bfabc46d",
+  "vendetta": {
+    "icon": "ic_games"
+  }
+}
